@@ -1,0 +1,14 @@
+%YAML:1.0
+---
+SIM_MAP_JPG_PATH: "../data/HMD.jpg"
+SIM_HMD_TXT_PATH: "../data/HMD.txt"
+SIM_START_LONGITUDE: "2.12673"
+SIM_START_LATITUDE: "48.89612"
+SIM_START_HDG: "48.89612"
+
+#
+
+p1_latitude: "48.89775"
+p1_longitude: "2.1253444"
+p2_latitude: "48.8956722"
+p2_longitude: "2.129883333"
