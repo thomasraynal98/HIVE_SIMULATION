@@ -119,6 +119,27 @@ struct Data_road
     }
 };
 
+int get_redis_multi_str(sw::redis::Redis* redis, std::string channel, std::vector<std::string>& stockage);
+
+struct sim_robot
+{
+    Geographic_point* point;
+    double hdg;
+
+    sim_robot(double a, double b, double c)
+        : hdg(c)
+        {point = new Geographic_point(a,b);}
+
+    void update(sw::redis::Redis* redis)
+    {
+        std::vector<std::string> vect_redis_str;
+        get_redis_multi_str(redis, "NAV_GLOBAL_POSITION", vect_redis_str);
+        point->longitude = std::stod(vect_redis_str[1]);
+        point->latitude = std::stod(vect_redis_str[2]);
+        hdg = std::stod(vect_redis_str[3]);
+    }
+};
+
 void f_sim();
 void f_keyboard();
 void f_rendering();
@@ -126,7 +147,6 @@ void Read_YAML_file(sw::redis::Redis* redis, std::string path, std::vector<Geogr
 void set_redis_var(sw::redis::Redis* redis, std::string channel, std::string value);
 void pub_redis_var(sw::redis::Redis* redis, std::string channel, std::string value);
 std::string get_redis_str(sw::redis::Redis* redis, std::string channel);
-int get_redis_multi_str(sw::redis::Redis* redis, std::string channel, std::vector<std::string>& stockage);
 int get_multi_str(std::string str, std::vector<std::string>& vec_str);
 int64_t get_curr_timestamp();
 std::string get_event_str(int ID_event, std::string event_description, std::string event_info);
@@ -137,6 +157,7 @@ void print_redis(sw::redis::Redis* redis, std::string channel_str);
 std::string get_standard_robot_id_str(sw::redis::Redis* redis);
 bool compare_redis_var(sw::redis::Redis* redis, std::string channel, std::string compare);
 
+
 // DATA MANAGEMENT.
 void Read_TXT_file(std::string path, std::vector<Data_node>& vector_node, std::vector<Data_road>& road_vector);
 
@@ -144,3 +165,8 @@ void Read_TXT_file(std::string path, std::vector<Data_node>& vector_node, std::v
 void Read_JPG_file(std::string path, cv::Mat& img);
 void Init_data_map(cv::Mat& map_current, cv::Mat& map_data);
 void Project_all_element(std::vector<Geographic_point>& ref_border, std::vector<Data_node>& node_vector, cv::Mat& map_current, cv::Mat& map_data, std::vector<Data_road>& road_vector, bool speed_view);
+void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, int element_type, Geographic_point* position, double hdg);
+Geographic_point get_new_position(Geographic_point* start_position, double bearing, double distance);
+long double deg_to_rad(const long double degree);
+double get_angular_distance(Geographic_point* pointA, Geographic_point* pointB);
+double rad_to_deg(double rad);

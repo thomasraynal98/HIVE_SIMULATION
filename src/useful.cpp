@@ -252,3 +252,99 @@ void Project_all_element(std::vector<Geographic_point>& ref_border, std::vector<
         cv::circle(map_data,    cv::Point((int)(node.col_idx),(int)(node.row_idx)),5, cv::Scalar(node.node_ID), cv::FILLED, 1,0);
     }
 }
+
+void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, int element_type, Geographic_point* position, double hdg)
+{
+    double col_idx, row_idx, col_idx2, row_idx2;
+
+    if(element_type == 1)
+    {
+        // Classic robot drawing.
+        col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),7, cv::Scalar(0,222,255), cv::FILLED, 1,0);
+
+        Geographic_point orientation_robot = get_new_position(position, hdg, 1);
+        std::cout << orientation_robot.longitude << " " << orientation_robot.latitude << std::endl;
+        col_idx2 = ((orientation_robot.longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx2 = (double)(map_current.rows) - (((orientation_robot.latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+
+        // std::cout << "PIXEL DIST:" << sqrt(pow(col_idx-col_idx2,2)+pow(row_idx-row_idx2,2)) << std::endl;
+        // std::cout << "METER DIST:" << get_angular_distance(position, &orientation_robot) << std::endl;
+
+        cv::line(map_current, cv::Point((int)(col_idx),(int)(row_idx)), cv::Point((int)(col_idx2),(int)(row_idx2)), cv::Scalar(0, 0, 255), 2, cv::LINE_8);
+    }
+    if(element_type == 2)
+    {
+        // Classic point.
+        // Pour les points hdg devient une couleur.
+        col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+        
+        if(hdg == 1.0) cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),4, cv::Scalar(0,255,0), cv::FILLED, 1,0);
+    }
+    if(element_type == 3)
+    {
+        // Un cercle.
+        // Pour les cercles hdg devient le rayon.
+
+        // cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), radius, line_Color, thickness);
+    }
+}
+
+Geographic_point get_new_position(Geographic_point* start_position, double bearing, double distance)
+{
+    // [!] VRAI FORMULE.
+    // http://www.movable-type.co.uk/scripts/latlong.html?from=48.7819900,-122.2936380&to=48.7761100,-122.3395200
+    // double ang_distance = distance;///6371000;
+    // double start_lat_deg = deg_to_rad(start_position->latitude);
+    // double start_lon_deg = deg_to_rad(start_position->longitude);
+    // double latitude  = asin(sin(start_lat_deg) * cos(ang_distance) + cos(start_lat_deg) * sin(ang_distance) * cos(bearing));
+    // double longitude = start_lon_deg + atan2(sin(bearing)*sin(ang_distance)*cos(start_lat_deg), cos(ang_distance) - sin(start_lat_deg) * sin(latitude));
+    
+    // [!] Approche correct pour la carte mais pas robuste car diff long lat depend de l'endroit sur terre?
+    // https://www.youtube.com/watch?v=IVz4f36xwUs
+    double departure = distance*0.00001*0.9 * sin(deg_to_rad(bearing));
+    double latitude  = distance*0.00001*0.9 * cos(deg_to_rad(bearing));
+    double lon_f = start_position->longitude + (departure*1.52);
+    double lat_f = start_position->latitude + latitude;
+    
+    Geographic_point orientation_robot_position = Geographic_point(lon_f, lat_f);
+    return orientation_robot_position;
+}
+
+long double deg_to_rad(const long double degree)
+{
+    long double one_deg = (M_PI) / 180;
+    return (one_deg * degree);
+}
+
+double get_angular_distance(Geographic_point* pointA, Geographic_point* pointB)
+{
+    double lat1  = pointA->latitude;
+    double long1 = pointA->longitude;
+    double lat2  = pointB->latitude;
+    double long2 = pointB->longitude;
+    
+    double R = 6371000;
+    double r1 = lat1 * M_PI / 180;
+    double r2 = lat2 * M_PI / 180;
+    double dl = (lat2 - lat1) * M_PI/180;
+    double dd = (long2 - long1) * M_PI/180;
+
+    double a = sin(dl/2) * sin(dl/2) + cos(r1) * cos(r2) * sin(dd/2) * sin(dd/2);
+    double c = 2 * atan2(sqrt(a), sqrt(1-a));
+
+    // [?] c represente la distance angulaire.
+    // return c
+
+    return R * c;
+}
+
+double rad_to_deg(double rad)
+{
+    double deg = rad * 180 / M_PI;
+    if(deg > 360) deg = deg - 360;
+    if(deg < 0)   deg = deg + 360;
+    return deg;
+}
