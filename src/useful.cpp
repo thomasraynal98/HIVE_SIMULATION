@@ -11,19 +11,13 @@ void Read_YAML_file(sw::redis::Redis* redis, std::string path, std::vector<Geogr
     }
 
     std::string information;
-    size_t size = 10;
 
-    Geographic_point p1(0,0);
-    fsSettings["p1_longitude"] >> information;
-    p1.longitude = std::stod(information, &size);
-    fsSettings["p1_latitude"] >> information;
-    p1.latitude = std::stod(information);
-
-    Geographic_point p2(0,0);
-    fsSettings["p2_longitude"] >> information;
-    p2.longitude = std::stod(information);
-    fsSettings["p2_latitude"] >> information;
-    p2.latitude = std::stod(information);
+    read_yaml(redis, &fsSettings, "p1_longitude");
+    read_yaml(redis, &fsSettings, "p1_latitude");
+    read_yaml(redis, &fsSettings, "p2_longitude");
+    read_yaml(redis, &fsSettings, "p2_latitude");
+    Geographic_point p1(std::stod(get_redis_str(redis, "p1_longitude")),std::stod(get_redis_str(redis, "p1_latitude")));
+    Geographic_point p2(std::stod(get_redis_str(redis, "p2_longitude")),std::stod(get_redis_str(redis, "p2_latitude")));
 
     ref_border->push_back(p1);
     ref_border->push_back(p2);
@@ -265,7 +259,7 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
         cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),7, cv::Scalar(0,222,255), cv::FILLED, 1,0);
 
         Geographic_point orientation_robot = get_new_position(position, hdg, 1);
-        std::cout << orientation_robot.longitude << " " << orientation_robot.latitude << std::endl;
+
         col_idx2 = ((orientation_robot.longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
         row_idx2 = (double)(map_current.rows) - (((orientation_robot.latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
 
@@ -304,10 +298,16 @@ Geographic_point get_new_position(Geographic_point* start_position, double beari
     
     // [!] Approche correct pour la carte mais pas robuste car diff long lat depend de l'endroit sur terre?
     // https://www.youtube.com/watch?v=IVz4f36xwUs
-    double departure = distance*0.00001*0.9 * sin(deg_to_rad(bearing));
-    double latitude  = distance*0.00001*0.9 * cos(deg_to_rad(bearing));
-    double lon_f = start_position->longitude + (departure*1.52);
-    double lat_f = start_position->latitude + latitude;
+
+
+    long double departure = distance*0.00001*0.9 * sin(deg_to_rad(bearing));
+    long double latitude  = distance*0.00001*0.9 * cos(deg_to_rad(bearing));
+
+    std::cout << bearing << std::endl;
+    // std::cout << "DEP:" << departure << " LAT:" << latitude << std::endl;
+
+    long double lon_f = start_position->longitude + (departure*1.52);
+    long double lat_f = start_position->latitude + latitude;
     
     Geographic_point orientation_robot_position = Geographic_point(lon_f, lat_f);
     return orientation_robot_position;

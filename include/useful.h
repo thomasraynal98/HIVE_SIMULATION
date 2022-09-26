@@ -1,12 +1,14 @@
+#include <string.h>
+#include <iostream>
 #include <thread>
 #include <chrono>
-#include <bits/stdc++.h>
 #include <vector>
-#include <stdio.h>
-#include <stdlib.h>
-#include <iostream>
+#include <math.h>
 #include <fstream>
-#include <string>
+#include <cstdlib>
+#include <unistd.h>
+#include <iomanip>
+
 #include <math.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
@@ -18,9 +20,9 @@
 
 struct Geographic_point
 {
-    double longitude, latitude;
+    long double longitude, latitude;
 
-    Geographic_point(double a, double b)
+    Geographic_point(long double a, long double b)
         : longitude(a)
         , latitude(b)
         {}
@@ -120,6 +122,7 @@ struct Data_road
 };
 
 int get_redis_multi_str(sw::redis::Redis* redis, std::string channel, std::vector<std::string>& stockage);
+std::string get_redis_str(sw::redis::Redis* redis, std::string channel);
 
 struct sim_robot
 {
@@ -134,8 +137,11 @@ struct sim_robot
     {
         std::vector<std::string> vect_redis_str;
         get_redis_multi_str(redis, "NAV_GLOBAL_POSITION", vect_redis_str);
+
+        // std::cout << vect_redis_str[1] << " " << std::stod(vect_redis_str[1]) << std::endl;
+
         point->longitude = std::stod(vect_redis_str[1]);
-        point->latitude = std::stod(vect_redis_str[2]);
+        point->latitude  = std::stod(vect_redis_str[2]);
         hdg = std::stod(vect_redis_str[3]);
     }
 };
@@ -146,7 +152,6 @@ void f_rendering();
 void Read_YAML_file(sw::redis::Redis* redis, std::string path, std::vector<Geographic_point>* ref_border);
 void set_redis_var(sw::redis::Redis* redis, std::string channel, std::string value);
 void pub_redis_var(sw::redis::Redis* redis, std::string channel, std::string value);
-std::string get_redis_str(sw::redis::Redis* redis, std::string channel);
 int get_multi_str(std::string str, std::vector<std::string>& vec_str);
 int64_t get_curr_timestamp();
 std::string get_event_str(int ID_event, std::string event_description, std::string event_info);
