@@ -27,6 +27,14 @@ void Read_YAML_file(sw::redis::Redis* redis, std::string path, std::vector<Geogr
     read_yaml(redis, &fsSettings, "SIM_START_LONGITUDE");
     read_yaml(redis, &fsSettings, "SIM_START_LATITUDE");
     read_yaml(redis, &fsSettings, "SIM_START_HDG");
+    read_yaml(redis, &fsSettings, "SIM_GLOBAL_PATH");
+
+    read_yaml(redis, &fsSettings, "SIM_AUTO_PT_FUTUR");
+    read_yaml(redis, &fsSettings, "SIM_AUTO_PROJECT_PT_FUTUR");
+    read_yaml(redis, &fsSettings, "SIM_AUTO_PT_TARGET");
+    read_yaml(redis, &fsSettings, "SIM_AUTO_PT_ICC");
+    read_yaml(redis, &fsSettings, "SIM_AUTO_RADIUS_ICC");
+    read_yaml(redis, &fsSettings, "SIM_AUTO_PROJECT_PT_DESTINATION");
 }
 
 int64_t get_curr_timestamp()
@@ -276,6 +284,9 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
         row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
         
         if(hdg == 1.0) cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),4, cv::Scalar(0,255,0), cv::FILLED, 1,0);
+        if(hdg == 2.0) cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),4, cv::Scalar(255,200,150), cv::FILLED, 1,0);
+        if(hdg == 3.0) cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),4, cv::Scalar(255,0,127), cv::FILLED, 1,0);
+        if(hdg == 4.0) cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),5, cv::Scalar(255,255,128), cv::FILLED, 1,0);
     }
     if(element_type == 3)
     {
@@ -283,6 +294,39 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
         // Pour les cercles hdg devient le rayon.
 
         // cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), radius, line_Color, thickness);
+    }
+}
+
+void project_multi_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, int element_type, Geographic_point* positionA, Geographic_point* positionB)
+{
+    double col_idx, row_idx, col_idx2, row_idx2;
+
+    if(element_type == 1)
+    {
+        // CURRENT ROAD.
+        col_idx  = ((positionA->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx  = (double)(map_current.rows) - (((positionA->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+        col_idx2 = ((positionB->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx2 = (double)(map_current.rows) - (((positionB->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+    
+        cv::line(map_current, cv::Point((int)(col_idx),(int)(row_idx)), cv::Point((int)(col_idx2),(int)(row_idx2)), cv::Scalar(0,255,255), 7, cv::LINE_8);
+
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),5, cv::Scalar(0,0,255), cv::FILLED, 1,0);
+        cv::circle(map_current, cv::Point((int)(col_idx2),(int)(row_idx2)),5, cv::Scalar(0,0,255), cv::FILLED, 1,0);
+    }
+
+    if(element_type == 2)
+    {
+        // CURRENT ROAD.
+        col_idx  = ((positionA->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx  = (double)(map_current.rows) - (((positionA->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+        col_idx2 = ((positionB->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx2 = (double)(map_current.rows) - (((positionB->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+    
+        cv::line(map_current, cv::Point((int)(col_idx),(int)(row_idx)), cv::Point((int)(col_idx2),(int)(row_idx2)), cv::Scalar(105,0,0), 7, cv::LINE_8);
+
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),5, cv::Scalar(0,0,255), cv::FILLED, 1,0);
+        cv::circle(map_current, cv::Point((int)(col_idx2),(int)(row_idx2)),5, cv::Scalar(0,0,255), cv::FILLED, 1,0);
     }
 }
 
@@ -303,7 +347,6 @@ Geographic_point get_new_position(Geographic_point* start_position, double beari
     long double departure = distance*0.00001*0.9 * sin(deg_to_rad(bearing));
     long double latitude  = distance*0.00001*0.9 * cos(deg_to_rad(bearing));
 
-    std::cout << bearing << std::endl;
     // std::cout << "DEP:" << departure << " LAT:" << latitude << std::endl;
 
     long double lon_f = start_position->longitude + (departure*1.52);

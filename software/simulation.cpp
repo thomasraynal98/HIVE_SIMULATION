@@ -58,18 +58,74 @@ void f_rendering()
             next += std::chrono::milliseconds((int)ms_for_loop);
             std::this_thread::sleep_until(next);
 
+            // DRAW MAP.
             map_current_copy = map_current.clone();
             Init_data_map(map_current, map_data);
             Project_all_element(ref_border, node_vector, map_current_copy, map_data, road_vector, false); 
+
+            // DRAW ALL GLOBAL PATH.
+            std::vector<std::string> vect_str_redis;
+            get_redis_multi_str(&redis, "SIM_GLOBAL_PATH", vect_str_redis);
+
+            Geographic_point pointA = Geographic_point(0.0,0.0);
+            Geographic_point pointB = Geographic_point(0.0,0.0);
+
+            for(std::string road_curr : vect_str_redis)
+            {
+                for(auto road : road_vector)
+                {
+                    if(std::stoi(road_curr) == road.road_ID)
+                    {
+                        pointA = road.A->point;
+                        pointB = road.B->point;
+                        project_multi_geo_element(ref_border, map_current_copy, 2, &pointA, &pointB);
+                        break;
+                    }
+                }
+            }
+
+            // DRAW CURRENT MAP.
+            get_redis_multi_str(&redis, "NAV_ROAD_CURRENT_ID", vect_str_redis);
+
+            for(auto road : road_vector)
+            {
+                if(road.road_ID == std::stoi(vect_str_redis[1]))
+                {
+                    pointA = road.A->point;
+                    pointB = road.B->point;
+                }
+            }
+            project_multi_geo_element(ref_border, map_current_copy, 1, &pointA, &pointB);
+
+
+            // DRAW POINT FUTUR.
+            // get_redis_multi_str(&redis, "SIM_AUTO_PT_FUTUR", vect_str_redis);
+            // Geographic_point pt_futur = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
+            // project_geo_element(ref_border, map_current_copy, 2, &pt_futur, 1.0);
+
+            // DRAW POINT PROJECTED FUTUR.
+            get_redis_multi_str(&redis, "SIM_AUTO_PROJECT_PT_FUTUR", vect_str_redis);
+            Geographic_point pt_pfutur = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
+            project_geo_element(ref_border, map_current_copy, 2, &pt_pfutur, 2.0);
+
+            // DRAW POINT TARGET.
+            get_redis_multi_str(&redis, "SIM_AUTO_PT_TARGET", vect_str_redis);
+            Geographic_point pt_target = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
+            project_geo_element(ref_border, map_current_copy, 2, &pt_target, 3.0);
+
+            // DRAW DESTINATION POINT.
+            get_redis_multi_str(&redis, "NAV_AUTO_DESTINATION", vect_str_redis);
+            Geographic_point pt_destination = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+            project_geo_element(ref_border, map_current_copy, 2, &pt_destination, 1.0);
+
+            // DRAW DESTINATION PROJECTED POINT.
+            get_redis_multi_str(&redis, "NAV_AUTO_PROJECT_DESTINATION", vect_str_redis);
+            Geographic_point pt_destination_project = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+            project_geo_element(ref_border, map_current_copy, 2, &pt_destination_project, 4.0);
+
+            // DRAW ROBOT.
             Geographic_point robot = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
-            // std::cout << masimulation.point->longitude << " " << masimulation.point->latitude << " " << masimulation.hdg << std::endl;
             project_geo_element(ref_border, map_current_copy, 1, &robot, masimulation.hdg);
-
-
-            // masimulation.hdg += 1;
-            // Geographic_point new_position = get_new_position(masimulation.point, masimulation.hdg, 0.5);
-            // masimulation.point->longitude = new_position.longitude;
-            // masimulation.point->latitude = new_position.latitude;
 
             cv::imshow("HIVE MAP EDITOR", map_current_copy);
             char d =(char)cv::waitKey(25);
@@ -126,7 +182,6 @@ void f_sim()
 
             long double new_hdg = rad_to_deg(deg_to_rad(masimulation.hdg) - bearing);
 
-            // std::cout << new_hdg << " " << distance << std::endl;
             Geographic_point new_position = get_new_position(masimulation.point, new_hdg, distance);
 
             // 4. UPDATE ALL.
@@ -135,7 +190,6 @@ void f_sim()
             debug_str += std::to_string(new_position.latitude) + "|";
             debug_str += std::to_string(new_hdg) + "|";
 
-            std::cout << debug_str << std::endl;
 
             if(new_position.latitude > 0 && new_position.longitude > 0)
             {

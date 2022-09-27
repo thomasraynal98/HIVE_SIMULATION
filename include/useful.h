@@ -26,6 +26,12 @@ struct Geographic_point
         : longitude(a)
         , latitude(b)
         {}
+
+    Geographic_point operator=(Geographic_point* a) // by-value param invokes class copy-ctor
+    {
+        this->longitude = a->longitude;
+        this->latitude = a->latitude;
+    }
 };
 
 struct Data_node
@@ -175,3 +181,4 @@ Geographic_point get_new_position(Geographic_point* start_position, double beari
 long double deg_to_rad(const long double degree);
 double get_angular_distance(Geographic_point* pointA, Geographic_point* pointB);
 double rad_to_deg(double rad);
+void project_multi_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, int element_type, Geographic_point* positionA, Geographic_point* positionB);
