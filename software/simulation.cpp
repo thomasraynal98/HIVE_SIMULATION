@@ -33,11 +33,11 @@ int main()
     Project_all_element(ref_border, node_vector, map_current_copy, map_data, road_vector, false);
 
     // Thread run.
-    thread_sim          = std::thread(&f_sim);
+    // thread_sim          = std::thread(&f_sim);
     thread_rendering    = std::thread(&f_rendering);
     // thread_keyboard     = std::thread(&f_keyboard);
 
-    thread_sim.join();
+    // thread_sim.join();
     thread_rendering.join();
     // thread_keyboard.join();
 }
@@ -113,19 +113,34 @@ void f_rendering()
             Geographic_point pt_target = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
             project_geo_element(ref_border, map_current_copy, 2, &pt_target, 3.0);
 
-            // DRAW DESTINATION POINT.
-            get_redis_multi_str(&redis, "NAV_AUTO_DESTINATION", vect_str_redis);
-            Geographic_point pt_destination = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
-            project_geo_element(ref_border, map_current_copy, 2, &pt_destination, 1.0);
 
             // DRAW DESTINATION PROJECTED POINT.
             get_redis_multi_str(&redis, "NAV_AUTO_PROJECT_DESTINATION", vect_str_redis);
-            Geographic_point pt_destination_project = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
-            project_geo_element(ref_border, map_current_copy, 2, &pt_destination_project, 4.0);
+            if(std::stoul(vect_str_redis[0]) != 0)
+            {
+                Geographic_point pt_destination_project = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+                project_geo_element(ref_border, map_current_copy, 2, &pt_destination_project, 4.0);
+                
+                // DRAW DESTINATION POINT.
+                get_redis_multi_str(&redis, "NAV_AUTO_DESTINATION", vect_str_redis);
+                Geographic_point pt_destination = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+                project_geo_element(ref_border, map_current_copy, 2, &pt_destination, 1.0);
+            }
 
-            // DRAW ROBOT.
-            Geographic_point robot = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
-            project_geo_element(ref_border, map_current_copy, 1, &robot, masimulation.hdg);
+            // UNCOMMANT FOR VISUALISATION.
+            get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
+            Geographic_point real_robot = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+            project_geo_element(ref_border, map_current_copy, 1, &real_robot, std::stod(vect_str_redis[3]));
+
+            // UNCOMMANT FOR SIMULATION
+            // // DRAW ROBOT 
+            // Geographic_point robot = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
+            // project_geo_element(ref_border, map_current_copy, 1, &robot, masimulation.hdg);
+
+            // // DRAW ROBOT WITH ERROR.
+            // get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
+            // Geographic_point robot_err = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+            // project_geo_element(ref_border, map_current_copy, 5, &robot_err, std::stod(vect_str_redis[3]));
 
             cv::imshow("HIVE MAP EDITOR", map_current_copy);
             char d =(char)cv::waitKey(25);
@@ -156,8 +171,20 @@ void f_sim()
     double ms_for_loop = frequency_to_ms(20);
     auto next = std::chrono::high_resolution_clock::now();
 
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution_angle(0.0,720.0);
+
+    std::default_random_engine generator2;
+    std::normal_distribution<double> distribution_dist(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_POS_ERR_M")));
+
+    std::default_random_engine generator3;
+    std::normal_distribution<double> distribution_new_hdg(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_HDG_ERR_M")));
+
     while(true)
     {
+        std::normal_distribution<double> distribution_dist(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_POS_ERR_M")));
+        std::normal_distribution<double> distribution_new_hdg(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_HDG_ERR_M")));
+
         next += std::chrono::milliseconds((int)ms_for_loop);
         std::this_thread::sleep_until(next);
 
@@ -185,18 +212,34 @@ void f_sim()
             Geographic_point new_position = get_new_position(masimulation.point, new_hdg, distance);
 
             // 4. UPDATE ALL.
-            debug_str = std::to_string(get_curr_timestamp()) + "|";
-            debug_str += std::to_string(new_position.longitude) + "|";
-            debug_str += std::to_string(new_position.latitude) + "|";
-            debug_str += std::to_string(new_hdg) + "|";
+            // debug_str = std::to_string(get_curr_timestamp()) + "|";
+            // debug_str += std::to_string(new_position.longitude) + "|";
+            // debug_str += std::to_string(new_position.latitude) + "|";
+            // debug_str += std::to_string(new_hdg) + "|";
 
 
             if(new_position.latitude > 0 && new_position.longitude > 0)
             {
-                set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
+                // NORMAL NO ERROR.
+                // set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
                 masimulation.point->longitude = new_position.longitude;
                 masimulation.point->latitude  = new_position.latitude;
                 masimulation.hdg              = new_hdg;
+
+                // WITH ERROR.
+                double angle_new_pos, dist_new_pose, new_hdg2;
+                angle_new_pos = distribution_angle(generator);
+                dist_new_pose = distribution_dist(generator2);
+                new_hdg2 = new_hdg + distribution_new_hdg(generator3);
+                if(new_hdg2 > 360) new_hdg2 -= 360;
+                if(new_hdg2 < 0) new_hdg2 += 360;
+
+                Geographic_point pos_with_error = get_new_position(masimulation.point, angle_new_pos, dist_new_pose);
+                debug_str = std::to_string(get_curr_timestamp()) + "|";
+                debug_str += std::to_string(pos_with_error.longitude) + "|";
+                debug_str += std::to_string(pos_with_error.latitude) + "|";
+                debug_str += std::to_string(new_hdg2) + "|";
+                set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
             }
 
         }

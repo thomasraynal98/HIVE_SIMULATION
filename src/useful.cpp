@@ -35,6 +35,9 @@ void Read_YAML_file(sw::redis::Redis* redis, std::string path, std::vector<Geogr
     read_yaml(redis, &fsSettings, "SIM_AUTO_PT_ICC");
     read_yaml(redis, &fsSettings, "SIM_AUTO_RADIUS_ICC");
     read_yaml(redis, &fsSettings, "SIM_AUTO_PROJECT_PT_DESTINATION");
+
+    read_yaml(redis, &fsSettings, "SIM_GPS_POS_ERR_M");
+    read_yaml(redis, &fsSettings, "SIM_GPS_HDG_ERR_M");
 }
 
 int64_t get_curr_timestamp()
@@ -294,6 +297,23 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
         // Pour les cercles hdg devient le rayon.
 
         // cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), radius, line_Color, thickness);
+    }
+    if(element_type == 5)
+    {
+        // ERROR GPS VISUALISATION.
+        col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),5, cv::Scalar(255,255,51), cv::FILLED, 1,0);
+
+        Geographic_point orientation_robot = get_new_position(position, hdg, 1);
+
+        col_idx2 = ((orientation_robot.longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx2 = (double)(map_current.rows) - (((orientation_robot.latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+
+        // std::cout << "PIXEL DIST:" << sqrt(pow(col_idx-col_idx2,2)+pow(row_idx-row_idx2,2)) << std::endl;
+        // std::cout << "METER DIST:" << get_angular_distance(position, &orientation_robot) << std::endl;
+
+        cv::line(map_current, cv::Point((int)(col_idx),(int)(row_idx)), cv::Point((int)(col_idx2),(int)(row_idx2)), cv::Scalar(0, 0, 255), 2, cv::LINE_8);
     }
 }
 
