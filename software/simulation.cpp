@@ -33,11 +33,11 @@ int main()
     Project_all_element(ref_border, node_vector, map_current_copy, map_data, road_vector, false);
 
     // Thread run.
-    // thread_sim          = std::thread(&f_sim);
+    thread_sim          = std::thread(&f_sim);
     thread_rendering    = std::thread(&f_rendering);
     // thread_keyboard     = std::thread(&f_keyboard);
 
-    // thread_sim.join();
+    thread_sim.join();
     thread_rendering.join();
     // thread_keyboard.join();
 }
@@ -128,19 +128,19 @@ void f_rendering()
             }
 
             // UNCOMMANT FOR VISUALISATION.
-            get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
-            Geographic_point real_robot = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
-            project_geo_element(ref_border, map_current_copy, 1, &real_robot, std::stod(vect_str_redis[3]));
+            // get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
+            // Geographic_point real_robot = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+            // project_geo_element(ref_border, map_current_copy, 1, &real_robot, std::stod(vect_str_redis[3]));
 
             // UNCOMMANT FOR SIMULATION
-            // // DRAW ROBOT 
-            // Geographic_point robot = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
-            // project_geo_element(ref_border, map_current_copy, 1, &robot, masimulation.hdg);
+            // DRAW ROBOT 
+            Geographic_point robot = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
+            project_geo_element(ref_border, map_current_copy, 1, &robot, masimulation.hdg);
 
-            // // DRAW ROBOT WITH ERROR.
-            // get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
-            // Geographic_point robot_err = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
-            // project_geo_element(ref_border, map_current_copy, 5, &robot_err, std::stod(vect_str_redis[3]));
+            // DRAW ROBOT WITH ERROR.
+            get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
+            Geographic_point robot_err = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
+            project_geo_element(ref_border, map_current_copy, 5, &robot_err, std::stod(vect_str_redis[3]));
 
             cv::imshow("HIVE MAP EDITOR", map_current_copy);
             char d =(char)cv::waitKey(25);
