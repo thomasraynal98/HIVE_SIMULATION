@@ -411,3 +411,11 @@ double rad_to_deg(double rad)
     if(deg < 0)   deg = deg + 360;
     return deg;
 }
+
+position_pxl get_pixel_pos(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, Geographic_point* position)
+{
+    double col_idx, row_idx;
+    col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+    row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+    return position_pxl(col_idx, row_idx);
+}

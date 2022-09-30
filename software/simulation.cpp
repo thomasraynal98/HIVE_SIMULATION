@@ -11,6 +11,7 @@ std::vector<Geographic_point> ref_border;
 
 // SIM
 sim_robot masimulation = sim_robot(2.12740,48.89721,90.0);
+bool zoom_flag = false;
 
 // VARIABLE FOR DATA.
 std::vector<Data_node> node_vector;
@@ -35,23 +36,42 @@ int main()
     // Thread run.
     thread_sim          = std::thread(&f_sim);
     thread_rendering    = std::thread(&f_rendering);
-    // thread_keyboard     = std::thread(&f_keyboard);
+    thread_keyboard     = std::thread(&f_keyboard);
 
     thread_sim.join();
     thread_rendering.join();
-    // thread_keyboard.join();
+    thread_keyboard.join();
 }
 
 void f_rendering()
 {
+    /*
+        TODO: get how many pixel for 10m.
+    */
+    
+    Geographic_point tempo1_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
+    position_pxl tempo1_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo1_curr);
+    std::cout << tempo1_curr_pxl.idx_i << " " << tempo1_curr_pxl.idx_j << std::endl;
+    Geographic_point tempo2_curr = get_new_position(&tempo1_curr, 0, 100);
+    position_pxl tempo2_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo2_curr);
+    std::cout << tempo2_curr_pxl.idx_i << " " << tempo2_curr_pxl.idx_j << std::endl;
+
+    double m_per_pix = sqrt(pow(tempo1_curr_pxl.idx_j - tempo2_curr_pxl.idx_j, 2)) / 100;
+    int pixel_box = (int)(m_per_pix * 15);
+    std::cout << pixel_box << " " << m_per_pix << std::endl;
+
+    cv::Mat zoom;
+
     while(true)
     {
         double ms_for_loop = frequency_to_ms(5);
         auto next = std::chrono::high_resolution_clock::now();
 
         int mouseParam = cv::EVENT_FLAG_LBUTTON;
-        cv::namedWindow( "HIVE MAP EDITOR", 4);
-        cv::setMouseCallback("HIVE MAP EDITOR",mouseHandler, NULL);
+        cv::namedWindow( "HIVE_SIMULATION", 4);
+        cv::setMouseCallback("HIVE_SIMULATION",mouseHandler, NULL);
+
+        cv::namedWindow( "ZOOM_HIVE_SIMULATION", 4);
 
         while(true)
         {
@@ -142,7 +162,18 @@ void f_rendering()
             Geographic_point robot_err = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
             project_geo_element(ref_border, map_current_copy, 5, &robot_err, std::stod(vect_str_redis[3]));
 
-            cv::imshow("HIVE MAP EDITOR", map_current_copy);
+            if(zoom_flag)
+            {
+                Geographic_point tempo_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
+                position_pxl tempo_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo_curr);
+
+                map_current_copy(cv::Rect(tempo_curr_pxl.idx_i-pixel_box, tempo_curr_pxl.idx_j-pixel_box, pixel_box*2, pixel_box*2)).copyTo(zoom);
+                // map_current_copy(cv::Rect(0, 0, 200, 200)).copyTo(zoom);
+
+                cv::imshow("ZOOM_HIVE_SIMULATION", zoom);
+            }
+
+            cv::imshow("HIVE_SIMULATION", map_current_copy);
             char d =(char)cv::waitKey(25);
         }
     }
@@ -150,9 +181,16 @@ void f_rendering()
 
 void f_keyboard()
 {
+    std::string str_input;
+
     while(true)
     {
-        
+        std::cin >> str_input;
+        if(str_input.compare("ZOOM") == 0)
+        {
+            zoom_flag = !zoom_flag;
+            // std::cout << "ZOOM_FLAG:" << zoom_flag << std::endl;
+        }
     }
 }
 
@@ -240,6 +278,16 @@ void f_sim()
                 debug_str += std::to_string(pos_with_error.latitude) + "|";
                 debug_str += std::to_string(new_hdg2) + "|";
                 set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
+
+                // UPDATE LOCAL. (lon=x, lat=y)
+                masimulation.lpoint->longitude = masimulation.lpoint->longitude + distance * cos(deg_to_rad(masimulation.lhdg) - bearing);
+                masimulation.lpoint->latitude  = masimulation.lpoint->latitude  + distance * sin(deg_to_rad(masimulation.lhdg) - bearing);
+                masimulation.lhdg              = rad_to_deg(deg_to_rad(masimulation.lhdg) - bearing);
+                debug_str = std::to_string(get_curr_timestamp()) + "|";
+                debug_str += std::to_string(masimulation.lpoint->longitude) + "|";
+                debug_str += std::to_string(masimulation.lpoint->latitude) + "|";
+                debug_str += std::to_string(masimulation.lhdg) + "|";
+                set_redis_var(&redis, "NAV_LOCAL_POSITION", debug_str);
             }
 
         }

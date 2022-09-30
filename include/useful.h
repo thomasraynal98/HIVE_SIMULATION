@@ -134,10 +134,14 @@ struct sim_robot
 {
     Geographic_point* point;
     double hdg;
+    Geographic_point* lpoint;
+    double lhdg;
 
     sim_robot(double a, double b, double c)
         : hdg(c)
-        {point = new Geographic_point(a,b);}
+        , lhdg(0.0)
+        {point = new Geographic_point(a,b);
+        lpoint = new Geographic_point(0.0,0.0);}
 
     void update(sw::redis::Redis* redis)
     {
@@ -150,6 +154,15 @@ struct sim_robot
         point->latitude  = std::stod(vect_redis_str[2]);
         hdg = std::stod(vect_redis_str[3]);
     }
+};
+
+struct position_pxl
+{
+    double idx_i, idx_j;
+    position_pxl(double a, double b)
+    : idx_i(a)
+    , idx_j(b)
+    {}
 };
 
 void f_sim();
@@ -182,3 +195,4 @@ long double deg_to_rad(const long double degree);
 double get_angular_distance(Geographic_point* pointA, Geographic_point* pointB);
 double rad_to_deg(double rad);
 void project_multi_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, int element_type, Geographic_point* positionA, Geographic_point* positionB);
+position_pxl get_pixel_pos(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, Geographic_point* positionA);
