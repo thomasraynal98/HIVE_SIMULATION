@@ -295,8 +295,10 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
     {
         // Un cercle.
         // Pour les cercles hdg devient le rayon.
+        col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
 
-        // cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), radius, line_Color, thickness);
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), (int)(hdg), cv::Scalar(178, 102, 255), 1, cv::LineTypes::LINE_8);
     }
     if(element_type == 5)
     {
@@ -418,4 +420,16 @@ position_pxl get_pixel_pos(std::vector<Geographic_point>& ref_border, cv::Mat& m
     col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
     row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
     return position_pxl(col_idx, row_idx);
+}
+
+void update_sensor_prm(sw::redis::Redis* redis, std::vector<Sensor_prm>& vect_sensor_prm)
+{
+    Sensor_prm cam1 = Sensor_prm(std::stod(get_redis_str(redis, "HARD_CAM1_DX")), std::stod(get_redis_str(redis, "HARD_CAM1_DY")), 0 , std::stod(get_redis_str(redis, "HARD_CAM1_ANGLE")));
+    Sensor_prm cam2 = Sensor_prm(std::stod(get_redis_str(redis, "HARD_CAM2_DX")), std::stod(get_redis_str(redis, "HARD_CAM2_DY")), 1 , std::stod(get_redis_str(redis, "HARD_CAM2_ANGLE")));
+    Sensor_prm lid1 = Sensor_prm(std::stod(get_redis_str(redis, "HARD_LID1_DX")), std::stod(get_redis_str(redis, "HARD_LID1_DY")), 10, std::stod(get_redis_str(redis, "HARD_LID1_ANGLE")));
+    Sensor_prm lid2 = Sensor_prm(std::stod(get_redis_str(redis, "HARD_LID2_DX")), std::stod(get_redis_str(redis, "HARD_LID2_DY")), 11, std::stod(get_redis_str(redis, "HARD_LID2_ANGLE")));
+    vect_sensor_prm.push_back(cam1);
+    vect_sensor_prm.push_back(cam2);
+    vect_sensor_prm.push_back(lid1);
+    vect_sensor_prm.push_back(lid2);
 }

@@ -158,11 +158,47 @@ struct sim_robot
 
 struct position_pxl
 {
-    double idx_i, idx_j;
+    double idx_col, idx_row;
     position_pxl(double a, double b)
-    : idx_i(a)
-    , idx_j(b)
+    : idx_col(a)
+    , idx_row(b)
     {}
+};
+
+struct fake_obj
+{
+    position_pxl* pxl;
+    Geographic_point* point;
+
+    fake_obj(double a, double b)
+    {
+        pxl = new position_pxl(a, b);
+        point = new Geographic_point(0.0, 0.0);
+    }
+};
+
+struct Vect_2D{
+    double x, y;
+    Vect_2D(double a, double b)
+        : x(a)
+        , y(b)
+        {}
+};
+
+struct Sensor_prm{
+    Vect_2D* pos_cart;
+    Vect_2D* pos_pol;
+    int sensor_ID;
+    double hdg;
+    Sensor_prm(double a, double b, int e, double f)
+        : sensor_ID(e)
+        , hdg(f)
+        {
+            pos_cart = new Vect_2D(a, b);
+            double dist  = sqrt(pow(a,2)+pow(b,2));
+            double angle = 2 * atan(b/(a+dist));
+            pos_pol = new Vect_2D(dist, angle);
+        }
 };
 
 void f_sim();
@@ -196,3 +232,4 @@ double get_angular_distance(Geographic_point* pointA, Geographic_point* pointB);
 double rad_to_deg(double rad);
 void project_multi_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, int element_type, Geographic_point* positionA, Geographic_point* positionB);
 position_pxl get_pixel_pos(std::vector<Geographic_point>& ref_border, cv::Mat& map_current, Geographic_point* positionA);
+void update_sensor_prm(sw::redis::Redis* redis, std::vector<Sensor_prm>& vect_sensor_prm);

@@ -11,15 +11,30 @@ std::vector<Geographic_point> ref_border;
 
 // SIM
 sim_robot masimulation = sim_robot(2.12740,48.89721,90.0);
-bool zoom_flag = false;
+bool zoom_flag = true;
+std::vector<fake_obj> obj_vector;
+std::vector<Sensor_prm> vect_sensor_prm;
 
 // VARIABLE FOR DATA.
 std::vector<Data_node> node_vector;
 std::vector<Data_road> road_vector;
 
+////////////////////////////////////////////////////////////////////////////////
+double pix_per_m = 5.0;
+
+// SIZE OF ZOOM MAP
+double size_zoom = 15.0;
+////////////////////////////////////////////////////////////////////////////////
+
+
 void mouseHandler(int event, int x, int y, int flags, void* param)
 {
     // [?] Si besoin.
+    switch(event){
+    case cv::EVENT_LBUTTONDOWN:
+        fake_obj n_obj = fake_obj(x, y);
+        obj_vector.push_back(n_obj);
+    }
 }
 
 int main()
@@ -29,6 +44,7 @@ int main()
     Read_YAML_file(&redis, "../data/HMD.yaml", &ref_border);
     Read_TXT_file(get_redis_str(&redis, "SIM_HMD_TXT_PATH"), node_vector, road_vector);
     Read_JPG_file(get_redis_str(&redis, "SIM_MAP_JPG_PATH"), map_current);
+    update_sensor_prm(&redis, vect_sensor_prm);
     map_current_copy = map_current.clone();
     Init_data_map(map_current, map_data);
     Project_all_element(ref_border, node_vector, map_current_copy, map_data, road_vector, false);
@@ -48,23 +64,24 @@ void f_rendering()
     /*
         TODO: get how many pixel for 10m.
     */
-    
+
+    ////////////////////////////////////////////////////////////////////////////////
     Geographic_point tempo1_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
     position_pxl tempo1_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo1_curr);
-    std::cout << tempo1_curr_pxl.idx_i << " " << tempo1_curr_pxl.idx_j << std::endl;
+    // std::cout << tempo1_curr_pxl.idx_i << " " << tempo1_curr_pxl.idx_j << std::endl;
     Geographic_point tempo2_curr = get_new_position(&tempo1_curr, 0, 100);
     position_pxl tempo2_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo2_curr);
-    std::cout << tempo2_curr_pxl.idx_i << " " << tempo2_curr_pxl.idx_j << std::endl;
+    // std::cout << tempo2_curr_pxl.idx_i << " " << tempo2_curr_pxl.idx_j << std::endl;
+    pix_per_m = sqrt(pow(tempo1_curr_pxl.idx_row - tempo2_curr_pxl.idx_row, 2)) / 100;
+    int pixel_box = (int)(pix_per_m * size_zoom);
 
-    double m_per_pix = sqrt(pow(tempo1_curr_pxl.idx_j - tempo2_curr_pxl.idx_j, 2)) / 100;
-    int pixel_box = (int)(m_per_pix * 15);
-    std::cout << pixel_box << " " << m_per_pix << std::endl;
 
     cv::Mat zoom;
 
+
     while(true)
     {
-        double ms_for_loop = frequency_to_ms(5);
+        double ms_for_loop = frequency_to_ms(10);
         auto next = std::chrono::high_resolution_clock::now();
 
         int mouseParam = cv::EVENT_FLAG_LBUTTON;
@@ -123,6 +140,12 @@ void f_rendering()
             // Geographic_point pt_futur = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
             // project_geo_element(ref_border, map_current_copy, 2, &pt_futur, 1.0);
 
+            // DRAW CIRCLE POINT.
+            get_redis_multi_str(&redis, "SIM_AUTO_PT_ICC", vect_str_redis);
+            Geographic_point pt_circle = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
+            int radius = std::stoi(get_redis_str(&redis, "SIM_AUTO_RADIUS_ICC"));
+            project_geo_element(ref_border, map_current_copy, 3, &pt_circle, (double)(radius*pix_per_m));
+
             // DRAW POINT PROJECTED FUTUR.
             get_redis_multi_str(&redis, "SIM_AUTO_PROJECT_PT_FUTUR", vect_str_redis);
             Geographic_point pt_pfutur = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
@@ -162,13 +185,34 @@ void f_rendering()
             Geographic_point robot_err = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
             project_geo_element(ref_border, map_current_copy, 5, &robot_err, std::stod(vect_str_redis[3]));
 
+            // DRAW OBSTACLE
+            for(auto obj : obj_vector)
+            {
+                cv::circle(map_current_copy, cv::Point((int)(obj.pxl->idx_col),(int)(obj.pxl->idx_row)), (int)(0), cv::Scalar(0, 102, 204), 1, cv::LineTypes::LINE_8);
+            }
+
             if(zoom_flag)
             {
                 Geographic_point tempo_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
                 position_pxl tempo_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo_curr);
 
-                map_current_copy(cv::Rect(tempo_curr_pxl.idx_i-pixel_box, tempo_curr_pxl.idx_j-pixel_box, pixel_box*2, pixel_box*2)).copyTo(zoom);
+                map_current_copy(cv::Rect(tempo_curr_pxl.idx_col-pixel_box, tempo_curr_pxl.idx_row-pixel_box, pixel_box*2, pixel_box*2)).copyTo(zoom);
                 // map_current_copy(cv::Rect(0, 0, 200, 200)).copyTo(zoom);
+                
+                // DRAW DIRECT MAP
+                std::vector<std::string> direct_map_vect;
+                get_redis_multi_str(&redis, "SIM_DIRECT_MAP", direct_map_vect);
+                for(int i = 0; i < direct_map_vect.size(); i+=2)
+                {
+                    double idx_col, idx_row;
+
+                    double dist  = sqrt(pow(masimulation.lpoint->longitude-std::stod(direct_map_vect[i]),2)+pow(masimulation.lpoint->latitude-std::stod(direct_map_vect[i+1]),2)) * pix_per_m;
+                    double angle = 2 * atan((std::stod(direct_map_vect[i+1]) - masimulation.lpoint->latitude) / ((std::stod(direct_map_vect[i]) - masimulation.lpoint->longitude)+sqrt(pow(masimulation.lpoint->longitude-std::stod(direct_map_vect[i]),2)+pow(masimulation.lpoint->latitude-std::stod(direct_map_vect[i+1]),2))));
+                    // std::cout << "SIM ANGLE : " << angle << std::endl;
+                    idx_col = pixel_box + dist * cos(angle);
+                    idx_row = pixel_box + dist * sin(angle);
+                    cv::circle(zoom, cv::Point((int)(idx_col),(int)(idx_row)),2, cv::Scalar(0,0,255), 1, cv::LineTypes::LINE_8);
+                }
 
                 cv::imshow("ZOOM_HIVE_SIMULATION", zoom);
             }
@@ -190,6 +234,10 @@ void f_keyboard()
         {
             zoom_flag = !zoom_flag;
             // std::cout << "ZOOM_FLAG:" << zoom_flag << std::endl;
+        }
+        if(str_input.compare("CLEAR") == 0)
+        {
+            obj_vector.clear();
         }
     }
 }
@@ -264,6 +312,7 @@ void f_sim()
                 masimulation.point->latitude  = new_position.latitude;
                 masimulation.hdg              = new_hdg;
 
+
                 // WITH ERROR.
                 double angle_new_pos, dist_new_pose, new_hdg2;
                 angle_new_pos = distribution_angle(generator);
@@ -272,12 +321,55 @@ void f_sim()
                 if(new_hdg2 > 360) new_hdg2 -= 360;
                 if(new_hdg2 < 0) new_hdg2 += 360;
 
+                // WITHOUT ERROR.
                 Geographic_point pos_with_error = get_new_position(masimulation.point, angle_new_pos, dist_new_pose);
                 debug_str = std::to_string(get_curr_timestamp()) + "|";
-                debug_str += std::to_string(pos_with_error.longitude) + "|";
-                debug_str += std::to_string(pos_with_error.latitude) + "|";
-                debug_str += std::to_string(new_hdg2) + "|";
+                debug_str += std::to_string(masimulation.point->longitude) + "|";
+                debug_str += std::to_string(masimulation.point->latitude) + "|";
+                debug_str += std::to_string(new_hdg) + "|";
                 set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
+
+                // Geographic_point pos_with_error = get_new_position(masimulation.point, angle_new_pos, dist_new_pose);
+                // debug_str = std::to_string(get_curr_timestamp()) + "|";
+                // debug_str += std::to_string(pos_with_error.longitude) + "|";
+                // debug_str += std::to_string(pos_with_error.latitude) + "|";
+                // debug_str += std::to_string(new_hdg2) + "|";
+                // set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);    
+
+                // UPDATE POSITION OF ALL SENSOR AND COMPUTE FAKE OBJ.
+                // CAM1
+                Geographic_point pos_cam1 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[0].pos_pol->y, vect_sensor_prm[0].pos_pol->x);
+                position_pxl pos_cam1_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
+
+                std::string cam1_str = std::to_string(get_curr_timestamp()) + "|";
+                for(auto obj : obj_vector)
+                {
+                    double dist = sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)) * (1/pix_per_m);
+                    if(dist < 10.0)
+                    {
+                        double tempo    = (obj.pxl->idx_col-pos_cam1_pxl.idx_col)/((obj.pxl->idx_row-pos_cam1_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
+                        double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
+                        double ang_sens = masimulation.hdg + vect_sensor_prm[0].hdg;
+                        
+                        double angle;
+                        if(ang_sens - ang_diff > 0)
+                        {
+                            if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
+                            else{angle = -(ang_sens - ang_diff);}
+                        }
+                        else
+                        {
+                            if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
+                            else{ angle = ang_diff - ang_sens;}
+                        }
+                        // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
+
+                        if(abs(angle) < 90)
+                        {cam1_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
+                    }
+                }
+                set_redis_var(&redis, "ENV_CAM1_OBSTACLE", cam1_str);
+                // END CAM1
 
                 // UPDATE LOCAL. (lon=x, lat=y)
                 masimulation.lpoint->longitude = masimulation.lpoint->longitude + distance * cos(deg_to_rad(masimulation.lhdg) - bearing);
