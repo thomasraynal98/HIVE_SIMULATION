@@ -38,6 +38,14 @@ void Read_YAML_file(sw::redis::Redis* redis, std::string path, std::vector<Geogr
 
     read_yaml(redis, &fsSettings, "SIM_GPS_POS_ERR_M");
     read_yaml(redis, &fsSettings, "SIM_GPS_HDG_ERR_M");
+
+    read_yaml(redis, &fsSettings, "SIM_AUTO_PT_ICC_NEW");
+    read_yaml(redis, &fsSettings, "SIM_AUTO_RADIUS_ICC_NEW");
+
+    read_yaml(redis, &fsSettings, "SIM_GPS_LX_ERR_M");
+    read_yaml(redis, &fsSettings, "SIM_GPS_LY_ERR_M");
+    read_yaml(redis, &fsSettings, "SIM_GPS_LHDG_ERR_M");
+    read_yaml(redis, &fsSettings, "SIM_SENSOR_ERR_M");
 }
 
 int64_t get_curr_timestamp()
@@ -267,7 +275,7 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
         // Classic robot drawing.
         col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
         row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
-        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),7, cv::Scalar(0,222,255), cv::FILLED, 1,0);
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),4, cv::Scalar(0,222,255), cv::FILLED, 1,0);
 
         Geographic_point orientation_robot = get_new_position(position, hdg, 1);
 
@@ -300,12 +308,21 @@ void project_geo_element(std::vector<Geographic_point>& ref_border, cv::Mat& map
 
         cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), (int)(hdg), cv::Scalar(178, 102, 255), 1, cv::LineTypes::LINE_8);
     }
+    if(element_type == 4)
+    {
+        // Un cercle orange
+        // Pour les cercles hdg devient le rayon.
+        col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
+        row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
+
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)), (int)(hdg), cv::Scalar(102, 178, 255), 1, cv::LineTypes::LINE_8);
+    }
     if(element_type == 5)
     {
         // ERROR GPS VISUALISATION.
         col_idx = ((position->longitude - ref_border[0].longitude) * (double)(map_current.cols)) / (ref_border[1].longitude - ref_border[0].longitude);
         row_idx = (double)(map_current.rows) - (((position->latitude - ref_border[1].latitude) * (double)(map_current.rows)) / (ref_border[0].latitude - ref_border[1].latitude));
-        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),5, cv::Scalar(255,255,51), cv::FILLED, 1,0);
+        cv::circle(map_current, cv::Point((int)(col_idx),(int)(row_idx)),3, cv::Scalar(255,255,51), cv::FILLED, 1,0);
 
         Geographic_point orientation_robot = get_new_position(position, hdg, 1);
 

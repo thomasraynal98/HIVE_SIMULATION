@@ -146,6 +146,13 @@ void f_rendering()
             int radius = std::stoi(get_redis_str(&redis, "SIM_AUTO_RADIUS_ICC"));
             project_geo_element(ref_border, map_current_copy, 3, &pt_circle, (double)(radius*pix_per_m));
 
+            // // DRAW NEW CIRCLE POINT.
+            get_redis_multi_str(&redis, "SIM_AUTO_PT_ICC_NEW", vect_str_redis);
+            Geographic_point pt_circle2 = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
+            int radius2 = std::stoi(get_redis_str(&redis, "SIM_AUTO_RADIUS_ICC_NEW"));
+            project_geo_element(ref_border, map_current_copy, 4, &pt_circle2, (double)(radius2*pix_per_m));
+
+
             // DRAW POINT PROJECTED FUTUR.
             get_redis_multi_str(&redis, "SIM_AUTO_PROJECT_PT_FUTUR", vect_str_redis);
             Geographic_point pt_pfutur = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
@@ -191,6 +198,8 @@ void f_rendering()
                 cv::circle(map_current_copy, cv::Point((int)(obj.pxl->idx_col),(int)(obj.pxl->idx_row)), (int)(0), cv::Scalar(0, 102, 204), 1, cv::LineTypes::LINE_8);
             }
 
+            int direct_map_pt_number = 0;
+
             if(zoom_flag)
             {
                 Geographic_point tempo_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
@@ -199,24 +208,53 @@ void f_rendering()
                 map_current_copy(cv::Rect(tempo_curr_pxl.idx_col-pixel_box, tempo_curr_pxl.idx_row-pixel_box, pixel_box*2, pixel_box*2)).copyTo(zoom);
                 // map_current_copy(cv::Rect(0, 0, 200, 200)).copyTo(zoom);
                 
+                // IF ERROR COMMENT DRAW POINT.
                 // DRAW DIRECT MAP
-                std::vector<std::string> direct_map_vect;
-                get_redis_multi_str(&redis, "SIM_DIRECT_MAP", direct_map_vect);
-                for(int i = 0; i < direct_map_vect.size(); i+=2)
-                {
-                    double idx_col, idx_row;
+                // std::vector<std::string> direct_map_vect;
+                // get_redis_multi_str(&redis, "SIM_DIRECT_MAP", direct_map_vect);
+                // for(int i = 0; i < direct_map_vect.size(); i+=2)
+                // {
+                //     double idx_col, idx_row;
 
-                    double dist  = sqrt(pow(masimulation.lpoint->longitude-std::stod(direct_map_vect[i]),2)+pow(masimulation.lpoint->latitude-std::stod(direct_map_vect[i+1]),2)) * pix_per_m;
-                    double angle = 2 * atan((std::stod(direct_map_vect[i+1]) - masimulation.lpoint->latitude) / ((std::stod(direct_map_vect[i]) - masimulation.lpoint->longitude)+sqrt(pow(masimulation.lpoint->longitude-std::stod(direct_map_vect[i]),2)+pow(masimulation.lpoint->latitude-std::stod(direct_map_vect[i+1]),2))));
-                    // std::cout << "SIM ANGLE : " << angle << std::endl;
-                    idx_col = pixel_box + dist * cos(angle);
-                    idx_row = pixel_box + dist * sin(angle);
-                    cv::circle(zoom, cv::Point((int)(idx_col),(int)(idx_row)),2, cv::Scalar(0,0,255), 1, cv::LineTypes::LINE_8);
-                }
+                //     double dist  = sqrt(pow(masimulation.lpoint->longitude-std::stod(direct_map_vect[i]),2)+pow(masimulation.lpoint->latitude-std::stod(direct_map_vect[i+1]),2)) * pix_per_m;
+                //     double angle = 2 * atan((std::stod(direct_map_vect[i+1]) - masimulation.lpoint->latitude) / ((std::stod(direct_map_vect[i]) - masimulation.lpoint->longitude)+sqrt(pow(masimulation.lpoint->longitude-std::stod(direct_map_vect[i]),2)+pow(masimulation.lpoint->latitude-std::stod(direct_map_vect[i+1]),2))));
+                //     // std::cout << "SIM ANGLE : " << angle << std::endl;
+                //     idx_col = pixel_box + dist * cos(angle);
+                //     idx_row = pixel_box + dist * sin(angle);
+                //     cv::circle(zoom, cv::Point((int)(idx_col),(int)(idx_row)),1, cv::Scalar(0,0,255), 1, cv::LineTypes::LINE_8);
+
+                //     direct_map_pt_number++;
+                // }
+
 
                 cv::imshow("ZOOM_HIVE_SIMULATION", zoom);
             }
 
+            // DRAW TEXT
+            cv::Scalar curr_color;
+            if(direct_map_pt_number < 200) curr_color = cv::Scalar(0,255,0);
+            if(direct_map_pt_number >= 200 && direct_map_pt_number <= 1000) curr_color = cv::Scalar(102,255,255);
+            if(direct_map_pt_number > 1000) curr_color = cv::Scalar(0,0,255);
+            
+            cv::putText(map_current_copy, //target image
+            "Nb obstacle : ", //text
+            cv::Point(0, 50), //top-left position
+            cv::FONT_HERSHEY_DUPLEX,
+            1,
+            cv::Scalar(255,255,255), //font color
+            2);
+
+            cv::putText(map_current_copy, //target image
+            std::to_string(direct_map_pt_number), //text
+            cv::Point(250, 50), //top-left position
+            cv::FONT_HERSHEY_DUPLEX,
+            1,
+            curr_color, //font color
+            2);
+
+        
+
+            // DRAW ALL
             cv::imshow("HIVE_SIMULATION", map_current_copy);
             char d =(char)cv::waitKey(25);
         }
@@ -266,10 +304,28 @@ void f_sim()
     std::default_random_engine generator3;
     std::normal_distribution<double> distribution_new_hdg(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_HDG_ERR_M")));
 
+    std::default_random_engine generator_lx;
+    std::normal_distribution<double> distribution_lx(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_LX_ERR_M")));
+
+    std::default_random_engine generator_ly;
+    std::normal_distribution<double> distribution_ly(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_LY_ERR_M")));
+
+    std::default_random_engine generator_lhdg;
+    std::normal_distribution<double> distribution_lhdg(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_LHDG_ERR_M")));
+
+    std::default_random_engine generator_sensor;
+    std::normal_distribution<double> distribution_sensor(0.0,std::stod(get_redis_str(&redis, "SIM_SENSOR_ERR_M")));
+
     while(true)
     {
+        // PUT ERROR IN YOUR LIFE
         std::normal_distribution<double> distribution_dist(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_POS_ERR_M")));
         std::normal_distribution<double> distribution_new_hdg(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_HDG_ERR_M")));
+        std::normal_distribution<double> distribution_lx(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_LX_ERR_M")));
+        std::normal_distribution<double> distribution_ly(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_LY_ERR_M")));
+        std::normal_distribution<double> distribution_lhdg(0.0,std::stod(get_redis_str(&redis, "SIM_GPS_LHDG_ERR_M")));
+        std::normal_distribution<double> distribution_sensor(0.0,std::stod(get_redis_str(&redis, "SIM_SENSOR_ERR_M")));
+        // END OF ERROR.
 
         next += std::chrono::milliseconds((int)ms_for_loop);
         std::this_thread::sleep_until(next);
@@ -322,19 +378,19 @@ void f_sim()
                 if(new_hdg2 < 0) new_hdg2 += 360;
 
                 // WITHOUT ERROR.
-                Geographic_point pos_with_error = get_new_position(masimulation.point, angle_new_pos, dist_new_pose);
-                debug_str = std::to_string(get_curr_timestamp()) + "|";
-                debug_str += std::to_string(masimulation.point->longitude) + "|";
-                debug_str += std::to_string(masimulation.point->latitude) + "|";
-                debug_str += std::to_string(new_hdg) + "|";
-                set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
-
                 // Geographic_point pos_with_error = get_new_position(masimulation.point, angle_new_pos, dist_new_pose);
                 // debug_str = std::to_string(get_curr_timestamp()) + "|";
-                // debug_str += std::to_string(pos_with_error.longitude) + "|";
-                // debug_str += std::to_string(pos_with_error.latitude) + "|";
-                // debug_str += std::to_string(new_hdg2) + "|";
-                // set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);    
+                // debug_str += std::to_string(masimulation.point->longitude) + "|";
+                // debug_str += std::to_string(masimulation.point->latitude) + "|";
+                // debug_str += std::to_string(new_hdg) + "|";
+                // set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);
+
+                Geographic_point pos_with_error = get_new_position(masimulation.point, angle_new_pos, dist_new_pose);
+                debug_str = std::to_string(get_curr_timestamp()) + "|";
+                debug_str += std::to_string(pos_with_error.longitude) + "|";
+                debug_str += std::to_string(pos_with_error.latitude) + "|";
+                debug_str += std::to_string(new_hdg2) + "|";
+                set_redis_var(&redis, "NAV_GLOBAL_POSITION", debug_str);    
 
                 // UPDATE POSITION OF ALL SENSOR AND COMPUTE FAKE OBJ.
                 // CAM1
@@ -364,17 +420,66 @@ void f_sim()
                         }
                         // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
 
+                        // WITH ERROR
+                        dist += distribution_sensor(generator_sensor);
+
                         if(abs(angle) < 90)
                         {cam1_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
                     }
                 }
                 set_redis_var(&redis, "ENV_CAM1_OBSTACLE", cam1_str);
                 // END CAM1
+                // CAM2
+                Geographic_point pos_cam2 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[1].pos_pol->y, vect_sensor_prm[1].pos_pol->x);
+                position_pxl pos_cam2_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
 
-                // UPDATE LOCAL. (lon=x, lat=y)
-                masimulation.lpoint->longitude = masimulation.lpoint->longitude + distance * cos(deg_to_rad(masimulation.lhdg) - bearing);
-                masimulation.lpoint->latitude  = masimulation.lpoint->latitude  + distance * sin(deg_to_rad(masimulation.lhdg) - bearing);
-                masimulation.lhdg              = rad_to_deg(deg_to_rad(masimulation.lhdg) - bearing);
+                std::string cam2_str = std::to_string(get_curr_timestamp()) + "|";
+                for(auto obj : obj_vector)
+                {
+                    double dist = sqrt(pow(obj.pxl->idx_col-pos_cam2_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam2_pxl.idx_row,2)) * (1/pix_per_m);
+                    if(dist < 10.0)
+                    {
+                        double tempo    = (obj.pxl->idx_col-pos_cam2_pxl.idx_col)/((obj.pxl->idx_row-pos_cam2_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
+                        double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
+                        double ang_sens = masimulation.hdg + vect_sensor_prm[1].hdg;
+                        
+                        double angle;
+                        if(ang_sens - ang_diff > 0)
+                        {
+                            if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
+                            else{angle = -(ang_sens - ang_diff);}
+                        }
+                        else
+                        {
+                            if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
+                            else{ angle = ang_diff - ang_sens;}
+                        }
+                        // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
+
+                        // WITH ERROR
+                        dist += distribution_sensor(generator_sensor);
+
+                        if(abs(angle) < 90)
+                        {cam2_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
+                    }
+                }
+                set_redis_var(&redis, "ENV_CAM2_OBSTACLE", cam2_str);
+                // END CAM2
+
+                // UPDATE LOCAL. (lon=x, lat=y) WITHOUT ERROR
+                // masimulation.lpoint->longitude = masimulation.lpoint->longitude + distance * cos(deg_to_rad(masimulation.lhdg) - bearing);
+                // masimulation.lpoint->latitude  = masimulation.lpoint->latitude  + distance * sin(deg_to_rad(masimulation.lhdg) - bearing);
+                // masimulation.lhdg              = rad_to_deg(deg_to_rad(masimulation.lhdg) - bearing);
+                // debug_str = std::to_string(get_curr_timestamp()) + "|";
+                // debug_str += std::to_string(masimulation.lpoint->longitude) + "|";
+                // debug_str += std::to_string(masimulation.lpoint->latitude) + "|";
+                // debug_str += std::to_string(masimulation.lhdg) + "|";
+                // set_redis_var(&redis, "NAV_LOCAL_POSITION", debug_str);
+
+                // UPDATE LOCAL. (lon=x, lat=y) UN MAX D'ERROR
+                masimulation.lpoint->longitude = masimulation.lpoint->longitude + distance * cos(deg_to_rad(masimulation.lhdg) - bearing) + distribution_lx(generator_lx)/20;
+                masimulation.lpoint->latitude  = masimulation.lpoint->latitude  + distance * sin(deg_to_rad(masimulation.lhdg) - bearing) + distribution_ly(generator_ly)/20;
+                masimulation.lhdg              = rad_to_deg(deg_to_rad(masimulation.lhdg) - bearing + distribution_lhdg(generator_lhdg)/20);
                 debug_str = std::to_string(get_curr_timestamp()) + "|";
                 debug_str += std::to_string(masimulation.lpoint->longitude) + "|";
                 debug_str += std::to_string(masimulation.lpoint->latitude) + "|";
