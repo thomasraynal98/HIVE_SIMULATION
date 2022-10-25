@@ -49,6 +49,9 @@ int main()
     Init_data_map(map_current, map_data);
     Project_all_element(ref_border, node_vector, map_current_copy, map_data, road_vector, false);
 
+    set_redis_var(&redis, "ROBOT_MODE", "MANUAL");
+    set_redis_var(&redis, "MISSION_MOTOR_BRAKE", "TRUE");
+
     // Thread run.
     thread_sim          = std::thread(&f_sim);
     thread_rendering    = std::thread(&f_rendering);
@@ -146,12 +149,11 @@ void f_rendering()
             int radius = std::stoi(get_redis_str(&redis, "SIM_AUTO_RADIUS_ICC"));
             project_geo_element(ref_border, map_current_copy, 3, &pt_circle, (double)(radius*pix_per_m));
 
-            // // DRAW NEW CIRCLE POINT.
+            // DRAW NEW CIRCLE POINT.
             get_redis_multi_str(&redis, "SIM_AUTO_PT_ICC_NEW", vect_str_redis);
             Geographic_point pt_circle2 = Geographic_point(std::stod(vect_str_redis[0]), std::stod(vect_str_redis[1]));
             int radius2 = std::stoi(get_redis_str(&redis, "SIM_AUTO_RADIUS_ICC_NEW"));
             project_geo_element(ref_border, map_current_copy, 4, &pt_circle2, (double)(radius2*pix_per_m));
-
 
             // DRAW POINT PROJECTED FUTUR.
             get_redis_multi_str(&redis, "SIM_AUTO_PROJECT_PT_FUTUR", vect_str_redis);
@@ -176,7 +178,6 @@ void f_rendering()
                 Geographic_point pt_destination = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
                 project_geo_element(ref_border, map_current_copy, 2, &pt_destination, 1.0);
             }
-
             // UNCOMMANT FOR VISUALISATION.
             // get_redis_multi_str(&redis, "NAV_GLOBAL_POSITION", vect_str_redis);
             // Geographic_point real_robot = Geographic_point(std::stod(vect_str_redis[1]), std::stod(vect_str_redis[2]));
@@ -199,7 +200,6 @@ void f_rendering()
             }
 
             int direct_map_pt_number = 0;
-
             if(zoom_flag)
             {
                 Geographic_point tempo_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
@@ -251,7 +251,6 @@ void f_rendering()
             1,
             curr_color, //font color
             2);
-
         
 
             // DRAW ALL
@@ -316,6 +315,15 @@ void f_sim()
     std::default_random_engine generator_sensor;
     std::normal_distribution<double> distribution_sensor(0.0,std::stod(get_redis_str(&redis, "SIM_SENSOR_ERR_M")));
 
+    std::vector<std::string> previous_vect_state_mcu_cargo;
+    previous_vect_state_mcu_cargo.push_back("000000000000");
+    previous_vect_state_mcu_cargo.push_back("CLOSE");
+    previous_vect_state_mcu_cargo.push_back("CLOSE");
+    previous_vect_state_mcu_cargo.push_back("CLOSE");
+    set_redis_var(&redis, "MISSION_HARD_CARGO", "0000000000|CLOSE|CLOSE|CLOSE|");
+    uint64_t timestamp_open = get_curr_timestamp();
+    bool open_timestamp_on = false;
+
     while(true)
     {
         // PUT ERROR IN YOUR LIFE
@@ -337,8 +345,8 @@ void f_sim()
 
         // std::cout << "FRAME SIMULATION." << vect_redis_str[0] << std::endl;
         
-        if(std::stoul(vect_redis_str[0]) != 0)
-        {
+        // if(std::stoul(vect_redis_str[0]) != 0)
+        // {
             double speed_motor_l = std::stod(vect_redis_str[2]);
             double speed_motor_r = std::stod(vect_redis_str[5]);
 
@@ -394,76 +402,76 @@ void f_sim()
 
                 // UPDATE POSITION OF ALL SENSOR AND COMPUTE FAKE OBJ.
                 // CAM1
-                Geographic_point pos_cam1 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[0].pos_pol->y, vect_sensor_prm[0].pos_pol->x);
-                position_pxl pos_cam1_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
+                // Geographic_point pos_cam1 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[0].pos_pol->y, vect_sensor_prm[0].pos_pol->x);
+                // position_pxl pos_cam1_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
 
-                std::string cam1_str = std::to_string(get_curr_timestamp()) + "|";
-                for(auto obj : obj_vector)
-                {
-                    double dist = sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)) * (1/pix_per_m);
-                    if(dist < 10.0)
-                    {
-                        double tempo    = (obj.pxl->idx_col-pos_cam1_pxl.idx_col)/((obj.pxl->idx_row-pos_cam1_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
-                        double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
-                        double ang_sens = masimulation.hdg + vect_sensor_prm[0].hdg;
+                // std::string cam1_str = std::to_string(get_curr_timestamp()) + "|";
+                // for(auto obj : obj_vector)
+                // {
+                //     double dist = sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)) * (1/pix_per_m);
+                //     if(dist < 10.0)
+                //     {
+                //         double tempo    = (obj.pxl->idx_col-pos_cam1_pxl.idx_col)/((obj.pxl->idx_row-pos_cam1_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
+                //         double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
+                //         double ang_sens = masimulation.hdg + vect_sensor_prm[0].hdg;
                         
-                        double angle;
-                        if(ang_sens - ang_diff > 0)
-                        {
-                            if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
-                            else{angle = -(ang_sens - ang_diff);}
-                        }
-                        else
-                        {
-                            if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
-                            else{ angle = ang_diff - ang_sens;}
-                        }
-                        // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
+                //         double angle;
+                //         if(ang_sens - ang_diff > 0)
+                //         {
+                //             if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
+                //             else{angle = -(ang_sens - ang_diff);}
+                //         }
+                //         else
+                //         {
+                //             if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
+                //             else{ angle = ang_diff - ang_sens;}
+                //         }
+                //         // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
 
-                        // WITH ERROR
-                        dist += distribution_sensor(generator_sensor);
+                //         // WITH ERROR
+                //         dist += distribution_sensor(generator_sensor);
 
-                        if(abs(angle) < 90)
-                        {cam1_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
-                    }
-                }
-                set_redis_var(&redis, "ENV_CAM1_OBSTACLE", cam1_str);
-                // END CAM1
-                // CAM2
-                Geographic_point pos_cam2 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[1].pos_pol->y, vect_sensor_prm[1].pos_pol->x);
-                position_pxl pos_cam2_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
+                //         if(abs(angle) < 90)
+                //         {cam1_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
+                //     }
+                // }
+                // set_redis_var(&redis, "ENV_CAM1_OBJECTS", cam1_str);
+                // // END CAM1
+                // // CAM2
+                // Geographic_point pos_cam2 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[1].pos_pol->y, vect_sensor_prm[1].pos_pol->x);
+                // position_pxl pos_cam2_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
 
-                std::string cam2_str = std::to_string(get_curr_timestamp()) + "|";
-                for(auto obj : obj_vector)
-                {
-                    double dist = sqrt(pow(obj.pxl->idx_col-pos_cam2_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam2_pxl.idx_row,2)) * (1/pix_per_m);
-                    if(dist < 10.0)
-                    {
-                        double tempo    = (obj.pxl->idx_col-pos_cam2_pxl.idx_col)/((obj.pxl->idx_row-pos_cam2_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
-                        double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
-                        double ang_sens = masimulation.hdg + vect_sensor_prm[1].hdg;
+                // std::string cam2_str = std::to_string(get_curr_timestamp()) + "|";
+                // for(auto obj : obj_vector)
+                // {
+                //     double dist = sqrt(pow(obj.pxl->idx_col-pos_cam2_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam2_pxl.idx_row,2)) * (1/pix_per_m);
+                //     if(dist < 10.0)
+                //     {
+                //         double tempo    = (obj.pxl->idx_col-pos_cam2_pxl.idx_col)/((obj.pxl->idx_row-pos_cam2_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
+                //         double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
+                //         double ang_sens = masimulation.hdg + vect_sensor_prm[1].hdg;
                         
-                        double angle;
-                        if(ang_sens - ang_diff > 0)
-                        {
-                            if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
-                            else{angle = -(ang_sens - ang_diff);}
-                        }
-                        else
-                        {
-                            if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
-                            else{ angle = ang_diff - ang_sens;}
-                        }
-                        // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
+                //         double angle;
+                //         if(ang_sens - ang_diff > 0)
+                //         {
+                //             if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
+                //             else{angle = -(ang_sens - ang_diff);}
+                //         }
+                //         else
+                //         {
+                //             if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
+                //             else{ angle = ang_diff - ang_sens;}
+                //         }
+                //         // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
 
-                        // WITH ERROR
-                        dist += distribution_sensor(generator_sensor);
+                //         // WITH ERROR
+                //         dist += distribution_sensor(generator_sensor);
 
-                        if(abs(angle) < 90)
-                        {cam2_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
-                    }
-                }
-                set_redis_var(&redis, "ENV_CAM2_OBSTACLE", cam2_str);
+                //         if(abs(angle) < 90)
+                //         {cam2_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
+                //     }
+                // }
+                // set_redis_var(&redis, "ENV_CAM2_OBJECTS", cam2_str);
                 // END CAM2
 
                 // UPDATE LOCAL. (lon=x, lat=y) WITHOUT ERROR
@@ -485,8 +493,44 @@ void f_sim()
                 debug_str += std::to_string(masimulation.lpoint->latitude) + "|";
                 debug_str += std::to_string(masimulation.lhdg) + "|";
                 set_redis_var(&redis, "NAV_LOCAL_POSITION", debug_str);
+
+                // SIM BOX OPEN OR CLOSING.
+                std::vector<std::string> new_vect_state_mcu_cargo;
+                get_redis_multi_str(&redis, "MISSION_HARD_CARGO", new_vect_state_mcu_cargo);
+
+                for(int i = 1; i < new_vect_state_mcu_cargo.size(); i++)
+                {
+                    if(new_vect_state_mcu_cargo[i].compare(previous_vect_state_mcu_cargo[i]) != 0)
+                    {
+                        if(new_vect_state_mcu_cargo[i].compare("OPEN") == 0)
+                        {
+                            timestamp_open = get_curr_timestamp();
+                            open_timestamp_on = true;
+                            if(i == 1) pub_redis_var(&redis, "EVENT", get_event_str(66, "BOX_OPEN", "1"));
+                            if(i == 2) pub_redis_var(&redis, "EVENT", get_event_str(66, "BOX_OPEN", "2"));
+                            if(i == 3) pub_redis_var(&redis, "EVENT", get_event_str(66, "BOX_OPEN", "3"));
+                        }
+                        if(new_vect_state_mcu_cargo[i].compare("CLOSE") == 0)
+                        {
+                            if(i == 1) pub_redis_var(&redis, "EVENT", get_event_str(66, "BOX_CLOSE", "1"));
+                            if(i == 2) pub_redis_var(&redis, "EVENT", get_event_str(66, "BOX_CLOSE", "2"));
+                            if(i == 3) pub_redis_var(&redis, "EVENT", get_event_str(66, "BOX_CLOSE", "3"));
+                        }
+                    }
+
+                    previous_vect_state_mcu_cargo[i] = new_vect_state_mcu_cargo[i];
+                }
+
+                // std::cout << open_timestamp_on << std::endl;
+
+                // SIM CLOSING BOX
+                if(open_timestamp_on && time_is_over(get_curr_timestamp(), timestamp_open, 5000))
+                {
+                    open_timestamp_on = false;
+                    set_redis_var(&redis, "MISSION_HARD_CARGO", std::to_string(get_curr_timestamp()) + "|CLOSE|CLOSE|CLOSE|");
+                }
             }
 
-        }
+        // }
     }
 }
