@@ -163,6 +163,12 @@ struct position_pxl
     : idx_col(a)
     , idx_row(b)
     {}
+
+    position_pxl operator=(position_pxl a) // by-value param invokes class copy-ctor
+    {
+        idx_col = a.idx_col;
+        idx_row = a.idx_row;
+    }
 };
 
 struct fake_obj

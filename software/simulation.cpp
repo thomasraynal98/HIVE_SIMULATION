@@ -37,6 +37,13 @@ void mouseHandler(int event, int x, int y, int flags, void* param)
     }
 }
 
+/**
+ * NOTE: Fonctionnement du soft.
+ * 
+ * 1 - SIMULATION : Lancer tout les threads + mettre à true dans function zoom.
+ * 2 - VISUALISATION : Lancer tout les threads sauf le thread de simulation + mettre à true dans function zoom.
+ */
+
 int main()
 {
     std::cout << std::setprecision(10);
@@ -202,8 +209,21 @@ void f_rendering()
             int direct_map_pt_number = 0;
             if(zoom_flag)
             {
-                Geographic_point tempo_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
-                position_pxl tempo_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo_curr);
+                position_pxl tempo_curr_pxl = position_pxl(0.0, 0.0);
+
+                // POUR LA SIMULATION
+                if(false)
+                {
+                    Geographic_point tempo_curr = Geographic_point(masimulation.point->longitude, masimulation.point->latitude);
+                    tempo_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo_curr);
+                }
+                // POUR LA VISUALISATION
+                if(true)
+                {
+                    Geographic_point tempo_curr = Geographic_point(robot_err.longitude, robot_err.latitude);
+                    tempo_curr_pxl = get_pixel_pos(ref_border, map_current_copy, &tempo_curr);
+                }
+
 
                 map_current_copy(cv::Rect(tempo_curr_pxl.idx_col-pixel_box, tempo_curr_pxl.idx_row-pixel_box, pixel_box*2, pixel_box*2)).copyTo(zoom);
                 // map_current_copy(cv::Rect(0, 0, 200, 200)).copyTo(zoom);
@@ -437,41 +457,41 @@ void f_sim()
                 }
                 set_redis_var(&redis, "ENV_CAM1_OBJECTS", cam1_str);
                 // END CAM1
-                // // CAM2
-                // Geographic_point pos_cam2 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[1].pos_pol->y, vect_sensor_prm[1].pos_pol->x);
-                // position_pxl pos_cam2_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
+                // CAM2
+                Geographic_point pos_cam2 = get_new_position(masimulation.point, masimulation.hdg + vect_sensor_prm[1].pos_pol->y, vect_sensor_prm[1].pos_pol->x);
+                position_pxl pos_cam2_pxl = get_pixel_pos(ref_border, map_current_copy, &pos_cam1);
 
-                // std::string cam2_str = std::to_string(get_curr_timestamp()) + "|";
-                // for(auto obj : obj_vector)
-                // {
-                //     double dist = sqrt(pow(obj.pxl->idx_col-pos_cam2_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam2_pxl.idx_row,2)) * (1/pix_per_m);
-                //     if(dist < 10.0)
-                //     {
-                //         double tempo    = (obj.pxl->idx_col-pos_cam2_pxl.idx_col)/((obj.pxl->idx_row-pos_cam2_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
-                //         double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
-                //         double ang_sens = masimulation.hdg + vect_sensor_prm[1].hdg;
+                std::string cam2_str = std::to_string(get_curr_timestamp()) + "|";
+                for(auto obj : obj_vector)
+                {
+                    double dist = sqrt(pow(obj.pxl->idx_col-pos_cam2_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam2_pxl.idx_row,2)) * (1/pix_per_m);
+                    if(dist < 10.0)
+                    {
+                        double tempo    = (obj.pxl->idx_col-pos_cam2_pxl.idx_col)/((obj.pxl->idx_row-pos_cam2_pxl.idx_row)+sqrt(pow(obj.pxl->idx_col-pos_cam1_pxl.idx_col,2)+pow(obj.pxl->idx_row-pos_cam1_pxl.idx_row,2)));
+                        double ang_diff = 360 -(rad_to_deg(2 * atan(tempo)) + 180);
+                        double ang_sens = masimulation.hdg + vect_sensor_prm[1].hdg;
                         
-                //         double angle;
-                //         if(ang_sens - ang_diff > 0)
-                //         {
-                //             if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
-                //             else{angle = -(ang_sens - ang_diff);}
-                //         }
-                //         else
-                //         {
-                //             if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
-                //             else{ angle = ang_diff - ang_sens;}
-                //         }
-                //         // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
+                        double angle;
+                        if(ang_sens - ang_diff > 0)
+                        {
+                            if(ang_sens - ang_diff > 180) angle = 360 - (ang_sens - ang_diff);
+                            else{angle = -(ang_sens - ang_diff);}
+                        }
+                        else
+                        {
+                            if(ang_sens - ang_diff < -180) angle = -(360 - (ang_diff - ang_sens));
+                            else{ angle = ang_diff - ang_sens;}
+                        }
+                        // std::cout << "NEW MESURE " << ang_sens << " ANGLE DIFF " << ang_diff << "FINAL " << angle << std::endl;
 
-                //         // WITH ERROR
-                //         dist += distribution_sensor(generator_sensor);
+                        // WITH ERROR
+                        dist += distribution_sensor(generator_sensor);
 
-                //         if(abs(angle) < 90)
-                //         {cam2_str += "1|o|" + std::to_string(angle) + "|" + std::to_string(dist) + "|";}
-                //     }
-                // }
-                // set_redis_var(&redis, "ENV_CAM2_OBJECTS", cam2_str);
+                        if(abs(angle) < 90)
+                        { cam2_str += "o|" + std::to_string(dist) + "|" + std::to_string(-angle) + "|";}
+                    }
+                }
+                set_redis_var(&redis, "ENV_CAM2_OBJECTS", cam2_str);
                 // END CAM2
 
                 // UPDATE LOCAL. (lon=x, lat=y) WITHOUT ERROR
